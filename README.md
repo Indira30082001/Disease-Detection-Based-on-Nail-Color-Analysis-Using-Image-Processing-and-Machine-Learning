@@ -1,4 +1,7 @@
 **Disease detection based on Nail Color Analysis using Image processing and Machine Learning**
+
+
+
 **Abstract**
 Medical research has led to numerous advancements in diagnostic
 procedures, yet traditional pathological testing remains time-consuming,
