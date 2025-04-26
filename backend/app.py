@@ -104,22 +104,37 @@ def analyze_image_features(img_array):
     edge_strength = float(np.sqrt(np.mean(dx**2) + np.mean(dy**2)))
     
     # Calculate curvature (for clubbing detection)
-    # Clubbing often shows a distinctive curved profile
     height, width = img_array.shape[:2]
-    center_profile = img_array[height//2, :, 0]  # Take center horizontal profile
+    center_profile = img_array[height//2, :, 0]
     curvature = np.gradient(np.gradient(center_profile))
     max_curvature = float(np.max(np.abs(curvature)))
     
-    # Calculate symmetry (clubbing tends to be symmetric)
+    # Calculate symmetry
     left_half = img_array[:, :width//2]
     right_half = np.flip(img_array[:, width//2:], axis=1)
     symmetry_score = float(1.0 - np.mean(np.abs(left_half - right_half)))
+    
+    # Calculate additional features for other diseases
+    # For Melanoma detection
+    color_irregularity = float(np.std(mean_color) / np.mean(mean_color))
+    border_irregularity = float(np.mean(np.abs(dx)) + np.mean(np.abs(dy)))
+    
+    # For Onychogryphosis detection
+    vertical_asymmetry = float(np.mean(np.abs(img_array[:, :width//2] - img_array[:, width//2:])))
+    thickness_variation = float(np.std(np.mean(img_array, axis=(0,2))))
+    
+    # For Pitting detection
+    local_variations = float(np.mean(np.abs(img_array[1:] - img_array[:-1])))
+    surface_roughness = float(np.std(img_array, axis=(0,1,2)))
     
     logger.info(f"Color analysis - R: {red_value:.2f}, G: {green_value:.2f}, B: {blue_value:.2f}")
     logger.info(f"Blue ratio: {blue_ratio:.2f}, Is bluish: {is_bluish}")
     logger.info(f"Color variance: {color_variance:.2f}, Texture energy: {texture_energy:.2f}")
     logger.info(f"Edge strength: {edge_strength:.2f}, Max curvature: {max_curvature:.2f}")
     logger.info(f"Symmetry score: {symmetry_score:.2f}")
+    logger.info(f"Color irregularity: {color_irregularity:.2f}, Border irregularity: {border_irregularity:.2f}")
+    logger.info(f"Vertical asymmetry: {vertical_asymmetry:.2f}, Thickness variation: {thickness_variation:.2f}")
+    logger.info(f"Local variations: {local_variations:.2f}, Surface roughness: {surface_roughness:.2f}")
     
     return {
         'is_bluish': bool(is_bluish),
@@ -130,7 +145,13 @@ def analyze_image_features(img_array):
         'max_curvature': float(max_curvature),
         'symmetry_score': float(symmetry_score),
         'mean_colors': [float(x) for x in mean_color],
-        'std_colors': [float(x) for x in std_color]
+        'std_colors': [float(x) for x in std_color],
+        'color_irregularity': float(color_irregularity),
+        'border_irregularity': float(border_irregularity),
+        'vertical_asymmetry': float(vertical_asymmetry),
+        'thickness_variation': float(thickness_variation),
+        'local_variations': float(local_variations),
+        'surface_roughness': float(surface_roughness)
     }
 
 def detect_clubbing_characteristics(features):
@@ -161,63 +182,94 @@ def adjust_predictions(predictions, features):
     adjusted = predictions.copy()
     
     # Class indices
-    BLUE_FINGER_IDX = 1    # Index for blue_finger class
-    CLUBBING_IDX = 2       # Index for clubbing class
-    HEALTHY_NAIL_IDX = 3   # Index for healthy nail class
+    MELANOMA_IDX = 0      # Index for Acral_Lentiginous_Melanoma
+    BLUE_FINGER_IDX = 1   # Index for blue_finger class
+    CLUBBING_IDX = 2      # Index for clubbing class
+    HEALTHY_NAIL_IDX = 3  # Index for healthy nail class
+    ONYCHOGRYPHOSIS_IDX = 4  # Index for Onychogryphosis
+    PITTING_IDX = 5       # Index for pitting
     
     try:
         # Initialize adjustment factors
+        melanoma_factor = 1.0
         blue_factor = 1.0
         clubbing_factor = 1.0
         healthy_factor = 1.0
+        onychogryphosis_factor = 1.0
+        pitting_factor = 1.0
         
         # Calculate clubbing characteristics
         clubbing_score = detect_clubbing_characteristics(features)
         logger.info(f"Clubbing detection score: {clubbing_score:.3f}")
         
-        # Color-based adjustments
-        if features['is_bluish']:
-            blue_boost = min(1.2, 1.0 + (float(features['blue_ratio']) - 0.33))
+        # Melanoma detection adjustments
+        if features['color_irregularity'] > 0.3 and features['border_irregularity'] > 0.4:
+            melanoma_factor *= 1.5  # Increased boost
+            healthy_factor *= 0.7   # More aggressive reduction
+        elif features['color_irregularity'] > 0.2:  # Less strict threshold
+            melanoma_factor *= 1.2
+        
+        # Blue finger adjustments
+        if features['is_bluish'] and features['blue_ratio'] > 0.4:
+            blue_boost = min(1.5, 1.0 + (float(features['blue_ratio']) - 0.33))
             blue_factor *= blue_boost
-            if clubbing_score < 0.5:  # Only reduce clubbing if clubbing score is low
-                clubbing_factor *= 0.9
+            if clubbing_score < 0.5:
+                clubbing_factor *= 0.8  # More aggressive reduction
         else:
-            blue_factor *= 0.9
+            blue_factor *= 0.8  # More aggressive reduction
         
-        # Clubbing-specific adjustments
-        if clubbing_score > 0.6:  # Strong clubbing characteristics
-            clubbing_factor *= (1.0 + clubbing_score * 0.3)  # Up to 30% boost
-            blue_factor *= 0.9
-            healthy_factor *= 0.9
-        elif clubbing_score < 0.3:  # Weak clubbing characteristics
-            clubbing_factor *= 0.8
-            healthy_factor *= 1.1
+        # Clubbing adjustments - More strict criteria
+        if clubbing_score > 0.7:  # Increased threshold
+            clubbing_factor *= (1.0 + clubbing_score * 0.4)  # Increased boost
+            blue_factor *= 0.8
+            healthy_factor *= 0.8
+        elif clubbing_score < 0.4:  # More strict threshold
+            clubbing_factor *= 0.7  # More aggressive reduction
+            healthy_factor *= 1.2
         
-        # Texture-based adjustments
-        texture_energy = float(features['texture_energy'])
-        if texture_energy > 0.4:  # High texture energy suggests clubbing
-            clubbing_factor *= 1.1
-            healthy_factor *= 0.9
-        elif texture_energy < 0.2:  # Low texture energy suggests healthy or blue
-            healthy_factor *= 1.1
+        # Onychogryphosis adjustments
+        if features['vertical_asymmetry'] > 0.4 and features['thickness_variation'] > 0.3:
+            onychogryphosis_factor *= 1.5  # Increased boost
+            healthy_factor *= 0.7
+        elif features['vertical_asymmetry'] > 0.3:  # Less strict threshold
+            onychogryphosis_factor *= 1.2
         
-        # Symmetry adjustments
-        if features['symmetry_score'] > 0.8:  # High symmetry
-            clubbing_factor *= 1.1
-            healthy_factor *= 1.1
+        # Pitting adjustments
+        if features['local_variations'] > 0.3 and features['surface_roughness'] > 0.4:
+            pitting_factor *= 1.5  # Increased boost
+            healthy_factor *= 0.7
+        elif features['local_variations'] > 0.2:  # Less strict threshold
+            pitting_factor *= 1.2
         
         # Apply adjustments
+        adjusted[0, MELANOMA_IDX] *= melanoma_factor
         adjusted[0, BLUE_FINGER_IDX] *= blue_factor
         adjusted[0, CLUBBING_IDX] *= clubbing_factor
         adjusted[0, HEALTHY_NAIL_IDX] *= healthy_factor
+        adjusted[0, ONYCHOGRYPHOSIS_IDX] *= onychogryphosis_factor
+        adjusted[0, PITTING_IDX] *= pitting_factor
         
         # Log adjustment factors
-        logger.info(f"Adjustment factors - Blue: {blue_factor:.2f}, Clubbing: {clubbing_factor:.2f}, Healthy: {healthy_factor:.2f}")
+        logger.info(f"Adjustment factors - Melanoma: {melanoma_factor:.2f}, Blue: {blue_factor:.2f}, "
+                   f"Clubbing: {clubbing_factor:.2f}, Healthy: {healthy_factor:.2f}, "
+                   f"Onychogryphosis: {onychogryphosis_factor:.2f}, Pitting: {pitting_factor:.2f}")
         
         # Ensure no negative values
         adjusted = np.maximum(adjusted, 0)
         
         # Normalize probabilities
+        adjusted = adjusted / np.sum(adjusted)
+        
+        # Apply minimum confidence threshold of 60%
+        min_confidence = 0.6
+        adjusted = np.where(adjusted < min_confidence, 0, adjusted)
+        
+        # If all predictions are below threshold, keep the highest one
+        if np.sum(adjusted) == 0:
+            max_idx = np.argmax(predictions[0])
+            adjusted[0, max_idx] = predictions[0, max_idx]
+        
+        # Renormalize after thresholding
         adjusted = adjusted / np.sum(adjusted)
         
         # Log adjustments

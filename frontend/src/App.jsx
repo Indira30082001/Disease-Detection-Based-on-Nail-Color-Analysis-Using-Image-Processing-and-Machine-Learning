@@ -102,9 +102,9 @@ function App() {
   };
 
   const getConfidenceColor = (confidence) => {
-    if (confidence >= 0.5) return "#2ecc71"; // High confidence - green
-    if (confidence >= 0.3) return "#f1c40f"; // Medium confidence - yellow
-    return "#e74c3c"; // Low confidence - red
+    //if (confidence >= 0.5) return "#2ecc71"; // High confidence - green
+    //if (confidence >= 0.3) return "#f1c40f"; // Medium confidence - yellow
+    return "#f1c40f";
   };
 
   const renderPredictions = (predictions) => {
@@ -136,10 +136,7 @@ function App() {
                   backgroundColor: getConfidenceColor(pred.confidence),
                 }}
               />
-              <span
-                className="confidence-value"
-                style={{ color: getConfidenceColor(pred.confidence) }}
-              >
+              <span className="confidence-value" style={{ color: "black" }}>
                 {(pred.confidence * 100).toFixed(1)}%
               </span>
             </div>
@@ -250,13 +247,6 @@ function App() {
         <div className="result-section">
           <h3>Prediction Result:</h3>
           {renderPredictions(result.all_predictions)}
-          <div className="prediction-note">
-            <p>Note: Only showing predictions with confidence above 15%</p>
-          </div>
-          <p className="warning-text">
-            Note: Please consult a healthcare professional for accurate
-            diagnosis. These predictions are for educational purposes only.
-          </p>
         </div>
       )}
 
