@@ -198,7 +198,7 @@ function App() {
 
   return (
     <div className="App">
-      <h2>Skin Disease Detection</h2>
+      <h2>Disease Detection</h2>
 
       {modelStatus && modelStatus !== "loaded" && (
         <div className="model-status-warning">
