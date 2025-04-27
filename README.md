@@ -12,8 +12,10 @@ Inorder to run the app,
   The app opens in localhost automatically.  
 
 The home page for the app looks like:
-![Screenshot 2025-04-24 142312](https://github.com/user-attachments/assets/2ae8096e-a231-4c42-904e-de0c9deaad3a)
+![Screenshot 2025-04-27 141538](https://github.com/user-attachments/assets/dbe539d7-b2cd-4ac1-9519-d88013b6aafc)  
+
 Now,we can upload our nail image here.
-![Screenshot 2025-04-24 142326](https://github.com/user-attachments/assets/1fc89baa-a166-483e-ac8c-4b5cdc70540a)
+![Screenshot 2025-04-27 141608](https://github.com/user-attachments/assets/b354d418-aab8-4a39-9a74-8b9ffe370ea4)  
+
 After clicking Submit button, we can see the prediction result.
-![Screenshot 2025-04-24 142347](https://github.com/user-attachments/assets/9f499e96-757e-4a1a-a4e8-15436b5099c2)
+![Screenshot 2025-04-27 141632](https://github.com/user-attachments/assets/1c549c43-1ecd-41fd-9f15-8684a9849930)  
